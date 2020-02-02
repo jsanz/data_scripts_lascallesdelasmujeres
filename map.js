@@ -125,7 +125,7 @@ function cleanGeoms (geoms) {
             cleanRoadName(name, lang)
           , roadName);
           
-          logStream.write(`${geom.properties.name};${cleanName}\n`);
+          logStream.write(`${geom.properties.name};${cleanName};${geom.properties['@id']}\n`);
           listStreetNames.add(geom.properties.name);                   
         }
 

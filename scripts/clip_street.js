@@ -8,6 +8,8 @@ const overpass = require('query-overpass');
 const booleanContains = require('@turf/boolean-contains').default;
 const flatten = require('@turf/flatten').default;
 
+const parse = require('csv-parse/lib/sync');
+
 const args = require('yargs')
                 .usage('Pass a city name to get the step 1 data and an OSM relation ID to clip it!')
                 .epilog('GeoChicas OSM 2019')
@@ -68,6 +70,7 @@ function writeFeatures(outputPath, features){
 
 // main function
 async function processCity(city, relationId){
+    const basePath = path.join(process.cwd(),'data',city);
     // Get the original (square) geojson data
     const features = getFeatures(city);
     console.log(`${features.length} features on you GeoJSON file`);
@@ -75,7 +78,7 @@ async function processCity(city, relationId){
     // Get the OSM relation and flatten it to generate different geometries
     const cityBoundaries = flatten(await getBoundary(relationId)).features;
 
-    const cityFilePath = path.join(process.cwd(),'data',city, city + '_boundary.geojson');
+    const cityFilePath = path.join(basePath, city + '_boundary.geojson');
     writeFeatures(cityFilePath, cityBoundaries);
     console.log('City boundary: ', cityFilePath);
 
@@ -88,10 +91,30 @@ async function processCity(city, relationId){
 
     console.log('Filtered features: ', filteredFeatures.length);
     
-    const filteredFeaturesPath = path.join(process.cwd(),'data',city, city + '_streets_filtered.geojson');
+    const filteredFeaturesPath = path.join(basePath, city + '_streets_filtered.geojson');
     console.log('Writing the result at: ', filteredFeaturesPath)
     
     writeFeatures(filteredFeaturesPath, filteredFeatures);
+
+    // Generate a filtered list.csv
+    const streetsStr = fs.readFileSync(path.join(basePath, 'list.csv')).toString();
+    console.log(streetsStr.slice(0,100));
+    const streetsCsv = parse(streetsStr, {delimiter: ';'});
+
+    console.log(streetsCsv[0]);
+    process.exit(0);
+
+    const newStreet =  filteredFeatures
+                        .map( f => {
+                            const id = f.properties.id;
+                            return streetsCsv
+                                    .filter( s => s[2] == id)
+                                    .map( s => s.join(';'))
+                        })
+                        .filter(f => f.length != 0);
+    fs.writeFileSync(
+        path.join(basePath, 'list_filtered.csv'),
+        newStreet.join('\n'));
 }
 
 
